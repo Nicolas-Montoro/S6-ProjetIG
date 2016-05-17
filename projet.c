@@ -48,7 +48,7 @@ int IdleRunning = 1;
 float cameraPos[3] = {0, -15, -20};
 int cameraSpeed = 1;
 int cameraLimits[6] = {-1*(MAP_SIZE/2-20), (MAP_SIZE/2-20),
-	-35, -15,
+	-35, 0,
 	-1*(MAP_SIZE/2-20), (MAP_SIZE/2-20)};
 
 
@@ -58,6 +58,7 @@ enum ShapeList
 	Cube = 1,
 	Sphere,
 	Cylindre,
+	CylindreUni,
 	Disque
 };
 
@@ -73,10 +74,11 @@ typedef struct
 // Structure d'un objet (type, position[3], angle[3], matrice)
 typedef struct
 {
+	int push;
+	int pop;
 	int type;
 	float pos[3];
 	float angle[4];
-	int matrix;
 } Object;
 
 
@@ -91,21 +93,54 @@ enum ObjectName
 	ChaiseAssise,
 	ChaisePied,
 	ChaiseBarre,
-	ChaiseDossier
+	ChaiseDossier,
+	HautBuste,
+	Buste,
+	Bassin,
+	Cou,
+	Tete,
+	Epaule,
+	AvantBras,
+	Coude,
+	Bras,
+	Main,
+	Cuisse,
+	Tibia,
+	Genou,
+	Pied
 };
 
 /* Forme et taille de chaque type d'objet:
  * {Nom, Forme, {tailleX, tailleY, tailleZ}, {R, G, B}}
  */
 ObjectType objectsType[] = {
+	// Décor
 	{Sol, Cube, {MAP_SIZE, 3, MAP_SIZE}, {0.7, 0.7, 0.7}},
 	{Herbe, Disque, {0, 1000, 0}, {0, 0.7, 0}},
 	{Soleil, Sphere, {7000, 1, 1}, {1, 1, 0}},
 	{Mur, Cube, {MAP_SIZE+1.5, 30, 3}, {0.3, 0.3, 0.3}},
+	
+	// Chaise
 	{ChaiseAssise, Cube, {7, 1, 7}, {0.6, 0.3, 0}},
 	{ChaisePied, Cube, {1, 5, 1}, {0.6, 0.3, 0}},
 	{ChaiseBarre, Cube, {1, 4, 1}, {0.6, 0.3, 0}},
 	{ChaiseDossier, Cube, {7, 4, 1}, {0.6, 0.3, 0}},
+	
+	// Bonhomme
+	{Buste, CylindreUni, {3, 0.5, 6}, {1, 0.9, 0.7}},
+	{Epaule, Sphere, {1, 1, 1}, {1, 0.9, 0.7}},
+	{Coude, Sphere, {0.55, 1, 1}, {1, 0.9, 0.7}},
+	{Main, Sphere, {0.55, 1, 1}, {1, 0.9, 0.7}},
+	{AvantBras, Cylindre, {0.8, 0.5, 4}, {1, 0.9, 0.7}},
+	{Bras, Cylindre, {0.25,0.5,3.75},{1, 0.9, 0.7}},
+	{Bassin, Sphere , {1,1,2.9}, {0, 0, 0.3}},
+	{Cuisse, Cylindre,{1.17,1,5}, {0, 0, 0.3}},
+	{Genou, Sphere, {1, 1, 1}, {0, 0, 0.3}},
+	{Tibia, Cylindre, {0.8, 0.6, 5}, {0, 0, 0.3}},
+	{Pied, Sphere, {1.17, 0.5, 2}, {1, 0.9, 0.7}},
+	{HautBuste, Sphere, {3, 0.5, 0.5}, {1, 0.9, 0.7}},
+	{Cou, Cylindre, {1,1, 2}, {0.85, 0.45, 0}},
+	{Tete, Sphere, {1.8,1, 1}, {0.85, 0.45, 0}},
 	
 	{0, 0, {0, 0, 0}}
 };
@@ -114,27 +149,60 @@ ObjectType objectsType[] = {
  * {Type, {posX, posY, posZ}, {angle, x, y, z}, +-matrix}
  */
 Object objectsL[] = {
-	{Sol, {0, -1.5, 0}, {0, 0, 0, 0}, 1},
-	{Herbe, {0, 0, 0}, {90, 1, 0, 0}, 0},
-	{Soleil, {500, 0, -100000}, {0, 0, 0, 0}, -1},
-	{Mur, {0, 15, MAP_SIZE/2}, {0, 0, 0, 0}, 1},
-		{Mur, {0, 0, -1*MAP_SIZE}, {0, 0, 0, 0}, 0},
-		{Mur, {MAP_SIZE/2, 0, MAP_SIZE/2}, {90, 0, 1, 0}, 0},
-	{Mur, {0, 0, -1*MAP_SIZE}, {0, 0, 0, 0}, -1},
-	// Chaise
-	{ChaiseAssise, {0, 6.5, -20}, {0, 0, 1, 0}, 1},
-		{ChaisePied, {-3, -3, -3}, {0, 0, 0, 0}, 1},
-			{ChaisePied, {6, 0, 0}, {0, 0, 0, 0}, 0},
-			{ChaisePied, {0, 0, 6}, {0, 0, 0, 0}, 0},
-		{ChaisePied, {-6, 0, 0}, {0, 0, 0, 0}, -1},
-		{ChaiseBarre, {-3, 2.5, -3}, {0, 0, 0, 0}, 1},
-		{ChaiseBarre, {6, 0, 0}, {0, 0, 0, 0}, -1},
-	{ChaiseDossier, {0, 6.5, -3}, {0, 0, 0, 0}, -1},
-	//Bonhomme
+	// Décor:		0	à	6
+	{1, 0, Sol, {0, -1.5, 0}},
+	{0, 0, Herbe, {0, 0, 0}, {90, 1, 0, 0}},
+	{0, 1, Soleil, {500, 0, -100000}},
+	
+	{1, 0, Mur, {0, 15, MAP_SIZE/2}},
+		{0, 0, Mur, {0, 0, -1*MAP_SIZE}},
+		{0, 0, Mur, {MAP_SIZE/2, 0, MAP_SIZE/2}, {90, 0, 1, 0}},
+	{0, 1, Mur, {0, 0, -1*MAP_SIZE}},
 	
 	
+	// Chaise		7	à	14
+	{1, 0, ChaiseAssise, {0, 6.5, -20}, {0, 0, 1, 0}},
 	
-	{0, {0, 0, 0}, {0, 0, 0}, 0}
+		{1, 0, ChaisePied, {-3, -3, -3}},
+			{0, 0, ChaisePied, {6, 0, 0}},
+			{0, 0, ChaisePied, {0, 0, 6}},
+		{0, 1, ChaisePied, {-6, 0, 0}},
+		
+		{1, 0, ChaiseBarre, {-3, 2.5, -3}},
+		{0, 1, ChaiseBarre, {6, 0, 0}},
+	{0, 1, ChaiseDossier, {0, 6.5, -3}},
+	
+	
+	//Bonhomme		15	à	37
+	{1, 0, HautBuste, {0, 16, -5}, {0, 0,1,0}},
+		{1, 1, Buste, {0, 0, 0}, {90, 1,0,0}},
+		{1, 1, Cou, {0, 2, 0}, {90, 1,0,0}},
+		{1, 1, Tete, {0, 3, 0}},
+		{1, 1, Bassin, {0, -6, 0}, {90,0,1,0}}, // 19
+	
+		{1, 0, Epaule, {2.5, 0, 0}, {90, 1,0,0}},
+			{1, 1, AvantBras, {0, 0, 0}, {90, 0,1,0}},
+			{1, 1, Coude, {-9, 0,0}},
+			{1, 1, Bras, {-13.05, 0,0}, {90, 0,1,0}},
+		{0, 1, Main, {-13.05, 0,0}, {90, 0,1,0}}, // 24
+			
+		{1, 0, Epaule, {-2.5, 0, 0}, {90, 1,0,0}},
+			{1, 1, AvantBras, {0, 0, 0}, {-90, 0,1,0}},
+			{1, 1, Coude, {9,0,0}},
+			{1, 1, Bras, {13.05,0,0}, {-90,0,1,0}},
+		{0, 1, Main, {13.05, 0,0}, {90, 0,1,0}}, // 29
+			
+		{1, 0, Cuisse, {1.6, -5.2, 0}, {90, 1,0,0}},
+			{0, 0, Genou, {0, 0, 5}},
+			{1, 0, Tibia, {0, 0, 0}},			
+		{0, 2, Pied, {0, 0.8,5}, {90, 1,0,0}}, // 33
+			
+		{1, 0, Cuisse, {-1.6, -5.2, 0}, {90, 1,0,0}},
+			{0, 0, Genou, {0, 0, 5}},
+			{1, 0, Tibia, {0, 0, 0}},
+	{0, 3, Pied, {0, 0.8,5}, {90, 1,0,0}}, // 37
+	
+	{0, 0, 0, {0, 0, 0}, {0, 0, 0, 0}}
 };
 	
 
@@ -177,6 +245,7 @@ void checkCameraLimits();
 
 void init_cube(ObjectType object);
 void init_cylinder(ObjectType object, GLUquadricObj* qobj);
+void init_unicylinder(ObjectType object, GLUquadricObj* qobj);
 void init_sphere(ObjectType object);
 void init_disk(ObjectType object, GLUquadricObj* qobj);
 
@@ -222,6 +291,7 @@ GLvoid window_timer()
 	if(IdleRunning)
 	{
 		objectsL[7].angle[0] += delta;
+		objectsL[15].angle[0] += delta;
 	}
 	glutTimerFunc(latence,&window_timer,++Step);
 	glutPostRedisplay();
@@ -421,6 +491,9 @@ void Faire_Composantes() {
 			case Cylindre:
 				init_cylinder(objectsType[i], qobj);
 				break;
+			case CylindreUni:
+				init_unicylinder(objectsType[i], qobj);
+				break;
 			case Sphere:
 				init_sphere(objectsType[i]);
 				break;
@@ -455,13 +528,27 @@ void init_cylinder(ObjectType object, GLUquadricObj* qobj)
 }
 
 
+/* Display list de cylindre uni */
+void init_unicylinder(ObjectType object, GLUquadricObj* qobj)
+{
+	glNewList(object.id, GL_COMPILE);
+		glPushMatrix();
+			glColor3f(object.color[0], object.color[1], object.color[2]);
+			glScalef(1, object.size[1], 1);
+			gluCylinder(qobj, object.size[0], object.size[0], object.size[2], 20, 20);
+		glPopMatrix();
+	glEndList();
+}
+
 /* Display list de sphere */
 void init_sphere(ObjectType object)
 {
 	glNewList(object.id, GL_COMPILE);
-		glColor3f(object.color[0], object.color[1], object.color[2]);
-		glScalef(1, object.size[1], object.size[2]);
-		glutSolidSphere(object.size[0], 20, 20);
+		glPushMatrix();
+			glColor3f(object.color[0], object.color[1], object.color[2]);
+			glScalef(1, object.size[1], object.size[2]);
+			glutSolidSphere(object.size[0], 20, 20);
+		glPopMatrix();
 	glEndList();
 }
 
@@ -489,20 +576,13 @@ void render_scene()
 	// Affichage de tout les objets
 	for(i = 0; objectsL[i].type; i++)
 	{
-		j = objectsL[i].matrix;
-		while(j > 0)
-		{
+		for(j = 0; j < objectsL[i].push; j++)
 			glPushMatrix();
-			j--;
-		}
 		glTranslatef(objectsL[i].pos[0], objectsL[i].pos[1], objectsL[i].pos[2]);
 		glRotatef(objectsL[i].angle[0], objectsL[i].angle[1], objectsL[i].angle[2], objectsL[i].angle[3]);
 		glCallList(objectsL[i].type);
-		while(j < 0)
-		{
+		for(j = 0; j < objectsL[i].pop; j++)
 			glPopMatrix();
-			j++;
-		}
 	}
 
 	// Permutation des buffers lorsque le tracé est achevé
