@@ -20,6 +20,11 @@
 
 int writetiff(char *filename, char *description,
 	      int x, int y, int width, int height, int compression);
+	      
+	
+void mouvement(int indexMin,int indexMax,int angleMin,int angleMax);
+
+void allMouvements(int angle, double speed,int pos);
 
 #define windowWidth		800
 #define windowHeight	800
@@ -28,6 +33,12 @@ int writetiff(char *filename, char *description,
 #define GREEN 0.5
 #define BLUE  1
 #define ALPHA 1
+
+#define RIGHT 	4
+#define DOWN 	5
+#define LEFT	6
+#define UP 		7
+#define CHANGE_KEY 42
 
 #define true  1
 #define false 0
@@ -43,6 +54,11 @@ int Step = 0;
 int latence = 4;
 float delta = 0.1;
 int IdleRunning = 1;
+
+/*Variables pour gerer le mouvement*/
+
+int back[6]={0,0,0,0,0,0};
+int bodyMouvement[6]={12,16,10,14,1,6};
 
 /* Variables de la caméra */
 float cameraPos[3] = {0, -15, -1*(MAP_SIZE/2-20)};
@@ -334,8 +350,22 @@ GLvoid window_timer()
 		objectsL[debutBras+14].angle[0] = 90;
 		objectsL[debutBras+16].angle[0] = 0;
 		
+		
 		switch(persoAnim)
 		{
+
+			case UP:
+			case DOWN:
+			case LEFT:
+			case RIGHT:
+				objectsL[debutBras+6].angle[0]=40;
+				objectsL[debutBras+1].angle[0]=-40;
+				objectsL[debutBras+14].angle[0]=50;
+				objectsL[debutBras+10].angle[0]=130;
+				IdleRunning=0;
+				break;
+	
+
 			case Running: // Le perso cours
 				deltaAnim += delta;
 				posRunning += delta;
@@ -464,10 +494,63 @@ GLvoid window_timer()
 				break;
 		}
 	}
+	else{
+		switch(persoAnim)
+		{
+			case RIGHT:
+				allMouvements(90,0.5,0);
+			break;
+			
+			case DOWN:
+				allMouvements(0,0.5,2);
+				
+				break;
+			
+			case LEFT: 
+				allMouvements(270,-0.5,0);
+				break;
+			
+			case UP:
+				 allMouvements(180,-0.5,2);
+				break;
+		}
+		persoAnim=CHANGE_KEY;
+	}
 	glutTimerFunc(latence,&window_timer,++Step);
 	glutPostRedisplay();
 }
 
+void mouvement(int indexMin,int indexMax,int angleMin,int angleMax){
+	
+	int i;
+
+	objectsL[debutBras+3].angle[0] = -90;
+	objectsL[debutBras+8].angle[0] = -90;
+
+	
+	for(i=indexMin;i<indexMax;i++){
+		if(objectsL[debutBras+bodyMouvement[i]].angle[0]<angleMax&&back[i]==0)
+			objectsL[debutBras+bodyMouvement[i]].angle[0]++;
+		else
+			back[i]=1;
+			
+		if(back[i]==1&&objectsL[debutBras+bodyMouvement[i]].angle[0]>angleMin)
+			objectsL[debutBras+bodyMouvement[i]].angle[0]--;
+		else
+			back[i]=0;	
+	}	
+}
+
+void allMouvements(int angle, double speed,int pos){
+	
+	objectsL[16].angle[0]=angle;
+	objectsL[16].pos[pos]+=speed;
+	
+	mouvement(0,2,0,20);
+	mouvement(2,4,60,120);
+	mouvement(4,6,-30,30);
+	
+}
 
 // Initialisation d'OpenGL
 GLvoid initGL() 
@@ -601,6 +684,22 @@ GLvoid window_key(unsigned char key, int x, int y)
 			cameraPos[1] += cameraSpeed;
 			if(cameraPos[1] > cameraLimits[3])
 				cameraPos[1] = cameraLimits[3];
+			break;
+		case 'm': //Deplacement a droite
+			deltaAnim = 0;
+			persoAnim=RIGHT;
+			break;
+		case 'l': //Deplacemement vers l'arriere
+			deltaAnim = 0;
+			persoAnim=DOWN;
+			break;		
+		case 'k': //Deplacement a gauche
+			deltaAnim = 0;
+			persoAnim=LEFT;
+			break;
+		case 'o': //Deplacement vers l'avant
+			deltaAnim = 0;
+			persoAnim=UP;
 			break;
 	}
 }
