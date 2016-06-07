@@ -48,17 +48,15 @@ void allMouvements(int angle, double speed,int pos);
 #define PI 3.1415926535898
 
 #define MAP_SIZE	110
+#define PERSO_RUN_SPEED	1
+#define PERSO_WALK_SPEED	0.5
+#define PERSO_TURN_SPEED	5
 
 /* Variables de gestion du temps */
 int Step = 0;
 int latence = 4;
 float delta = 0.1;
 int IdleRunning = 1;
-
-/*Variables pour gerer le mouvement*/
-
-int back[6]={0,0,0,0,0,0};
-int bodyMouvement[6]={12,16,10,14,1,6};
 
 /* Variables de la caméra */
 float cameraPos[3] = {0, -15, -1*(MAP_SIZE/2-20)};
@@ -68,13 +66,18 @@ int cameraLimits[6] = {-1*(MAP_SIZE/2-20), (MAP_SIZE/2-20),
 	-1*(MAP_SIZE/2-20), (MAP_SIZE/2-20)};
 	
 /* Variables du personnage */
-enum PersoStates {Idle, Running, Walking, GoingToSit};
+enum PersoStates {Idle, Running, Walking, WalkingReverse,
+	GoingToSit, GettingUp, Sitting, Turn90_180, Turn180_0, Turn0_90};
 int persoAnim = Running;
 float deltaAnim = 0;
-float posRunning = 0;
-float posWalking = 0;
+float posAuto = 0;
+float posX = 0;
+float posZ = 0;
+float direction = 0;
+
 int goToChair = 0;
-int animDirection = 1;
+int manualMode = 0;
+int moveDirection = 0;
 
 
 // Enumération des formes possibles
@@ -336,8 +339,106 @@ GLvoid window_timer()
 		else
 			objectsL[15].pos[1] = -14;
 		
-		// Réinitialisation des angles
-		objectsL[16].pos[1] = 16;
+		if(manualMode)
+		{
+			objectsL[16].pos[0] = posX;
+			objectsL[16].pos[2] = posZ;
+			objectsL[16].angle[0] = direction;
+			if(persoAnim == Running)
+			{
+				posX += sin(direction*PI/180)*PERSO_RUN_SPEED;
+				posZ += cos(direction*PI/180)*PERSO_RUN_SPEED;
+			}
+			else if(persoAnim == Walking)
+			{
+				posX -= sin(direction*PI/180)*PERSO_WALK_SPEED;
+				posZ -= cos(direction*PI/180)*PERSO_WALK_SPEED;
+			}
+			if(moveDirection > 0)
+				moveDirection--;
+			else
+				persoAnim = Idle;
+		}
+		else // Gestion des déplacements automatiques
+		{
+			switch(persoAnim)
+			{
+				case Running: // Le perso cours
+					posAuto += delta;
+					if(posAuto >= 2*3*PI)
+						posAuto = posAuto - 2*3*PI;
+					objectsL[16].pos[0] = cos(posAuto/3)*20;
+					objectsL[16].pos[2] = sin(posAuto/3)*20;
+					objectsL[16].angle[0] = posAuto*180/PI/-3;
+					
+					if(goToChair
+					&& posAuto >= 3.0/2.0*PI-delta
+					&& posAuto <= 3.0/2.0*PI+delta)
+					{
+						posAuto = 0;
+						deltaAnim = 0;
+						persoAnim = Turn90_180;
+					}
+					break;
+					
+				case Walking: // Le perso marche vers la chaise
+				case WalkingReverse: // Le perso marche à l'opposé de la chaise
+					objectsL[16].pos[2] = 20 - posAuto;
+					objectsL[16].pos[0] = 0;
+					if(persoAnim == Walking)
+					{
+						posAuto += delta;
+						if(posAuto > 15)
+						{
+							persoAnim = Turn180_0;
+							posAuto = 0;
+							deltaAnim = 0;
+						}
+					}
+					else
+					{
+						posAuto -= delta;
+						if(posAuto < 0)
+						{
+							persoAnim = Turn0_90;
+							posAuto = 0;
+							deltaAnim = 0;
+						}
+					}
+					break;
+				
+				case GoingToSit: // Le perso s'assoit
+				case GettingUp: // Le perso se lève
+					break;
+					
+				case Sitting: // Le perso est assit
+					objectsL[16].pos[2] = 0;
+					objectsL[16].pos[0] = 0;
+					if(!goToChair)
+					{
+						posAuto = 0;
+						deltaAnim = 10;
+						persoAnim = GettingUp;
+					}
+					break;
+					
+				case Turn90_180: // Le perso se tourne de -90° à 180°
+				case Turn0_90:  // Le perso se tourne de 0° à -90°
+					objectsL[16].pos[2] = 20;
+					objectsL[16].pos[0] = 0;
+					break;
+				case Turn180_0:  // Le perso se tourne de 180° à 0°
+					objectsL[16].pos[2] = 5;
+					objectsL[16].pos[0] = 0;
+					break;
+				
+				default: // Le perso est immobile
+					break;
+			}
+		}
+		
+		
+		// Réinitialisation des animations
 		objectsL[19].angle[0] = 0;
 		objectsL[23].angle[0] = 0;
 		objectsL[25].angle[0] = 0;
@@ -350,41 +451,14 @@ GLvoid window_timer()
 		objectsL[debutBras+14].angle[0] = 90;
 		objectsL[debutBras+16].angle[0] = 0;
 		
+		// Running -> Turn90_180 -> Walking -> Turn180_0 -> GoingToSit -> Sitting
+		// Sitting -> WalkingReverse -> Turn180_90
 		
+		// Gestion des animations
 		switch(persoAnim)
 		{
-
-			case UP:
-			case DOWN:
-			case LEFT:
-			case RIGHT:
-				objectsL[debutBras+6].angle[0]=40;
-				objectsL[debutBras+1].angle[0]=-40;
-				objectsL[debutBras+14].angle[0]=50;
-				objectsL[debutBras+10].angle[0]=130;
-				IdleRunning=0;
-				break;
-	
-
 			case Running: // Le perso cours
 				deltaAnim += delta;
-				posRunning += delta;
-				if(posRunning >= 2*3*PI)
-					posRunning = posRunning - 2*3*PI;
-					
-				if(goToChair
-				&& posRunning >= 3.0/2.0*PI-delta
-				&& posRunning <= 3.0/2.0*PI+delta)
-				{
-					posWalking = 0;
-					persoAnim = Walking;
-					deltaAnim = 0;
-				}
-				
-				objectsL[16].pos[0] = cos(posRunning/3)*20;
-				objectsL[16].pos[2] = sin(posRunning/3)*20;
-				objectsL[16].angle[0] = posRunning*180/PI/-3;
-				
 				objectsL[debutBras+1].angle[0] = sin(deltaAnim)*40;
 				objectsL[debutBras+3].angle[0] = -90;
 				objectsL[debutBras+6].angle[0] = sin(deltaAnim+PI)*40;
@@ -395,97 +469,85 @@ GLvoid window_timer()
 				objectsL[debutBras+16].angle[0] = sin(deltaAnim+PI)*40+40;
 				break;
 				
-			case Walking: // Le perso marche vers ou non vers la chaise
+			case Walking: // Le perso marche vers la chaise
+			case WalkingReverse: // Le perso marche à l'opposé de la chaise
 				deltaAnim += delta;
-				if(deltaAnim < 90/10)
+				objectsL[debutBras+1].angle[0] = sin(deltaAnim)*20;
+				objectsL[debutBras+6].angle[0] = sin(deltaAnim+PI)*20;
+				objectsL[debutBras+10].angle[0] = sin(deltaAnim)*10+90;
+				objectsL[debutBras+12].angle[0] = sin(deltaAnim)*10+10;
+				objectsL[debutBras+14].angle[0] = sin(deltaAnim+PI)*10+90;
+				objectsL[debutBras+16].angle[0] = sin(deltaAnim+PI)*10+10;
+				break;
+			
+			case GoingToSit: // Le perso va s'assoir
+			case GettingUp: // Le perso se lève
+				objectsL[16].pos[2] = 5 - deltaAnim/2;
+				objectsL[16].pos[1] = 16 - deltaAnim/3.33;
+				objectsL[debutBras+10].angle[0] = 90 + sin(deltaAnim*PI/10/2)*-80;
+				objectsL[debutBras+12].angle[0] = sin(deltaAnim*PI/10/2)*80;
+				objectsL[debutBras+14].angle[0] = 90 + sin(deltaAnim*PI/10/2)*-80;
+				objectsL[debutBras+16].angle[0] = sin(deltaAnim*PI/10/2)*80;
+				if(persoAnim == GoingToSit)
 				{
-					if(animDirection == 1)
-						objectsL[16].angle[0] = -90 - deltaAnim*10;
-					else
-						objectsL[16].angle[0] = -1*deltaAnim*10;
-				}
-				else if(posWalking == -10)
-				{
-					persoAnim = Running;
-					animDirection = 1;
+					deltaAnim += delta;
+					if(deltaAnim > 10 + delta)
+						persoAnim = Sitting;
 				}
 				else
 				{
-					if(animDirection == 1)
+					deltaAnim -= delta;
+					if(deltaAnim < 0)
 					{
-						posWalking += delta;
-						objectsL[16].angle[0] = 180;
-					}
-					else
-					{
-						posWalking -= delta;
-						objectsL[16].angle[0] = 0;
-					}
-					objectsL[16].pos[2] = 20 - posWalking;
-					objectsL[16].pos[0] = 0;
-				
-					objectsL[debutBras+1].angle[0] = sin(deltaAnim)*20;
-					objectsL[debutBras+6].angle[0] = sin(deltaAnim+PI)*20;
-					objectsL[debutBras+10].angle[0] = sin(deltaAnim)*10+90;
-					objectsL[debutBras+12].angle[0] = sin(deltaAnim)*10+10;
-					objectsL[debutBras+14].angle[0] = sin(deltaAnim+PI)*10+90;
-					objectsL[debutBras+16].angle[0] = sin(deltaAnim+PI)*10+10;
-					if(posWalking >= 15.0)
-					{
-						persoAnim = GoingToSit;
-						deltaAnim = 0;
-					}
-					if(posWalking <= 0)
-					{
-						deltaAnim = 0;
-						posWalking = -10;
+						persoAnim = WalkingReverse;
+						posAuto = 15;
 					}
 				}
 				break;
 			
-			case GoingToSit: // Le persop s'assoit ou se lève
-				if(animDirection == 1)
-					deltaAnim += delta;
-				else
-					deltaAnim -= delta;
-				if(deltaAnim < 180/10)
+			case Turn90_180: // Le perso se tourne de -90° à 180°
+			case Turn180_0:  // Le perso se tourne de 180° à 0°
+			case Turn0_90:  // Le perso se tourne de 0° à -90°
+				deltaAnim += delta;
+				if(persoAnim == Turn90_180)
 				{
-					if(animDirection == 1)
-						objectsL[16].angle[0] = 180 - deltaAnim*10;
-					else
+					objectsL[16].angle[0] = -90 - deltaAnim*10;
+					if(deltaAnim >= 90/10)
 					{
-						posWalking = 15;
 						persoAnim = Walking;
-						deltaAnim = 90/10;
+						deltaAnim = 0;
 					}
 				}
-				else if(deltaAnim <= 28)
+				else if(persoAnim == Turn180_0)
 				{
-					objectsL[16].angle[0] = 0;
-					objectsL[16].pos[2] = 5 - deltaAnim/2 + 18/2;
-					objectsL[16].pos[1] = 16 - deltaAnim/3.33 + 18/3.33;
-					objectsL[debutBras+10].angle[0] = 90 + sin((deltaAnim-18)*PI/10/2)*-80;
-					objectsL[debutBras+12].angle[0] = sin((deltaAnim-18)*PI/10/2)*80;
-					objectsL[debutBras+14].angle[0] = 90 + sin((deltaAnim-18)*PI/10/2)*-80;
-					objectsL[debutBras+16].angle[0] = sin((deltaAnim-18)*PI/10/2)*80;
+					objectsL[16].angle[0] = 180 - deltaAnim*10;
+					if(deltaAnim >= 180/10)
+					{
+						persoAnim = GoingToSit;
+						deltaAnim = 0;
+					}
 				}
 				else
+				{
+					objectsL[16].angle[0] = -1*deltaAnim*10;
+					if(deltaAnim >= 90/10)
+					{
+						persoAnim = Running;
+						deltaAnim = 0;
+						posAuto = PI*1.5;
+					}
+				}
+			
+			case Sitting: // Le perso est assit
+			default: // Le perso est immobile
+				if(persoAnim == Sitting)
 				{
 					objectsL[debutBras+10].angle[0] = 10;
 					objectsL[debutBras+12].angle[0] = 80;
 					objectsL[debutBras+14].angle[0] = 10;
 					objectsL[debutBras+16].angle[0] = 80;
-					objectsL[16].pos[1] = 13;
-					if(!goToChair)
-					{
-						deltaAnim = 28;
-						animDirection = -1;
-					}
 				}
-			
-			default: // Le perso est immobile
-				if(persoAnim != GoingToSit)
-					deltaAnim += delta;
+				deltaAnim += delta;
 				objectsL[19].angle[0] = sin(deltaAnim/6)*40;
 				objectsL[23].angle[0] = sin(deltaAnim/6)*40;
 				objectsL[25].angle[0] = sin(deltaAnim/6)*40;
@@ -494,63 +556,11 @@ GLvoid window_timer()
 				break;
 		}
 	}
-	else{
-		switch(persoAnim)
-		{
-			case RIGHT:
-				allMouvements(90,0.5,0);
-			break;
-			
-			case DOWN:
-				allMouvements(0,0.5,2);
-				
-				break;
-			
-			case LEFT: 
-				allMouvements(270,-0.5,0);
-				break;
-			
-			case UP:
-				 allMouvements(180,-0.5,2);
-				break;
-		}
-		persoAnim=CHANGE_KEY;
-	}
+	
 	glutTimerFunc(latence,&window_timer,++Step);
 	glutPostRedisplay();
 }
 
-void mouvement(int indexMin,int indexMax,int angleMin,int angleMax){
-	
-	int i;
-
-	objectsL[debutBras+3].angle[0] = -90;
-	objectsL[debutBras+8].angle[0] = -90;
-
-	
-	for(i=indexMin;i<indexMax;i++){
-		if(objectsL[debutBras+bodyMouvement[i]].angle[0]<angleMax&&back[i]==0)
-			objectsL[debutBras+bodyMouvement[i]].angle[0]++;
-		else
-			back[i]=1;
-			
-		if(back[i]==1&&objectsL[debutBras+bodyMouvement[i]].angle[0]>angleMin)
-			objectsL[debutBras+bodyMouvement[i]].angle[0]--;
-		else
-			back[i]=0;	
-	}	
-}
-
-void allMouvements(int angle, double speed,int pos){
-	
-	objectsL[16].angle[0]=angle;
-	objectsL[16].pos[pos]+=speed;
-	
-	mouvement(0,2,0,20);
-	mouvement(2,4,60,120);
-	mouvement(4,6,-30,30);
-	
-}
 
 // Initialisation d'OpenGL
 GLvoid initGL() 
@@ -635,6 +645,7 @@ GLvoid window_key(unsigned char key, int x, int y)
 			{
 				persoAnim = Running;
 				deltaAnim = 0;
+				posAuto = 0;
 			}
 			else if(persoAnim == Running)
 			{
@@ -647,6 +658,21 @@ GLvoid window_key(unsigned char key, int x, int y)
 				goToChair = 1;
 			else
 				goToChair = 0;
+			break;
+		case 't': // Activer/désactiver le mode manuel
+			if(manualMode == 0)
+			{
+				manualMode = 1;
+				persoAnim = Idle;
+				posX = 0;
+				posZ = 20;
+				direction = 0;
+			}
+			else
+			{
+				manualMode = 0;
+				persoAnim = Running;
+			}
 			break;
 		case '+': // Augmenter vitesse
 			delta *= 1.01;
@@ -685,21 +711,27 @@ GLvoid window_key(unsigned char key, int x, int y)
 			if(cameraPos[1] > cameraLimits[3])
 				cameraPos[1] = cameraLimits[3];
 			break;
-		case 'm': //Deplacement a droite
-			deltaAnim = 0;
-			persoAnim=RIGHT;
+		case 'm': // Tourner à droite
+			if(manualMode)
+				direction -= PERSO_TURN_SPEED;
 			break;
-		case 'l': //Deplacemement vers l'arriere
-			deltaAnim = 0;
-			persoAnim=DOWN;
+		case 'l': // Déplacement vers l'arrière
+			if(manualMode)
+			{
+				persoAnim = Walking;
+				moveDirection = PERSO_WALK_SPEED*10;
+			}
 			break;		
-		case 'k': //Deplacement a gauche
-			deltaAnim = 0;
-			persoAnim=LEFT;
+		case 'k': // Tourner à gauche
+			if(manualMode)
+				direction += PERSO_TURN_SPEED;
 			break;
-		case 'o': //Deplacement vers l'avant
-			deltaAnim = 0;
-			persoAnim=UP;
+		case 'o': // Deplacement vers l'avant
+			if(manualMode)
+			{
+				persoAnim = Running;
+				moveDirection = PERSO_RUN_SPEED*10;
+			}
 			break;
 	}
 }
