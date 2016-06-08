@@ -48,7 +48,8 @@ GLvoid window_timer()
 		
 		if(manualMode)
 		{
-				objectsL[16].pos[0] = posX;
+				objectsL[16].pos[0] = posX;				
+				objectsL[16].pos[1] = 16;
 				objectsL[16].pos[2] = posZ;
 				objectsL[16].angle[0] = direction;
 				if(persoAnim == Running)
@@ -61,10 +62,12 @@ GLvoid window_timer()
 					posX -= sin(direction*PI/180)*PERSO_WALK_SPEED;
 					posZ -= cos(direction*PI/180)*PERSO_WALK_SPEED;
 				}
+				checkPersoLimits();
 				if(moveDirection > 0)
 					moveDirection--;
 				else
 					persoAnim = Idle;
+				
 		}
 		else // Gestion des déplacements automatiques
 		{
@@ -424,10 +427,8 @@ GLvoid window_key(unsigned char key, int x, int y)
 		case 'l': // Déplacement vers l'arrière
 			if(manualMode)
 			{
-				if(checkPersoLimits()){
 					persoAnim = Walking;
 					moveDirection = PERSO_WALK_SPEED*10;
-				}
 			}
 			break;		
 		case 'k': // Tourner à gauche
@@ -437,52 +438,36 @@ GLvoid window_key(unsigned char key, int x, int y)
 		case 'o': // Deplacement vers l'avant
 			if(manualMode)
 			{
-				if(checkPersoLimits()){
 					persoAnim = Running;
 					moveDirection = PERSO_RUN_SPEED*10;
-				}
 			}
 			break;
 	}
 }
 
-int checkPersoLimits(){
-				printf("%f : %f \n",objectsL[16].pos[0],objectsL[16].pos[2]);
-	if(-1.0*objectsL[16].pos[0] < cameraLimits[0]){
-		objectsL[16].pos[0] = -1*cameraLimits[0];
-		persoAnim=Idle;
-		moveDirection=0;
+void checkPersoLimits(){
+	if(-1.0*posX < cameraLimits[0])
 		posX=-1*cameraLimits[0];
-		return 0;
-	}
-	if(objectsL[16].pos[0]<0 && objectsL[16].pos[0] < -1*cameraLimits[1]){
-		objectsL[16].pos[2] = -1*cameraLimits[1];
-		persoAnim=Idle;
-		moveDirection=0;
-		posX=-1*cameraLimits[0];
-		return 0;
-	}
-	if(-1.0*objectsL[16].pos[2] < cameraLimits[4]){
-		objectsL[16].pos[2] = -1*cameraLimits[4];
-		persoAnim=Idle;
-		moveDirection=0;
+	else if(posX<0 && posX < -1*cameraLimits[1])
+		posX=-1*cameraLimits[1];
+		
+	if(-1*posZ < cameraLimits[4])
 		posZ=-1*cameraLimits[4];
-		return 0;
-	}
-	if(objectsL[16].pos[2]<0 && objectsL[16].pos[2] < -1*cameraLimits[5]){
-		objectsL[16].pos[2] = -1*cameraLimits[5];
-		persoAnim=Idle;
-		moveDirection=0;
+	else if(posZ<0 && posZ < -1*cameraLimits[5])
 		posZ=-1*cameraLimits[5];
-		return 0;
+		
+	if(posZ>chaiseLimits[0]+PERSO_RUN_SPEED&&posZ<chaiseLimits[1]-PERSO_RUN_SPEED){
+		if(posX>0&&posX<chaiseLimits[1])
+			posX=chaiseLimits[1];
+		else if(posX<0&&posX>chaiseLimits[0])
+			posX=chaiseLimits[0];
 	}
-	if(objectsL[16].pos[2]<chaiseLimits[1] &&objectsL[16].pos[2]>chaiseLimits[0]&&objectsL[16].pos[2]<chaiseLimits[1] &&objectsL[16].pos[2]>chaiseLimits[0]){	
-		persoAnim=Idle;
-		moveDirection=0;
-	}
-	
-	return 1;
-	
+	if(posX>chaiseLimits[0]+PERSO_RUN_SPEED&&posX<chaiseLimits[1]-PERSO_RUN_SPEED){
+		if(posZ>0&&posZ<chaiseLimits[1])
+			posZ=chaiseLimits[1];
+		else if(posZ<0&&posZ>chaiseLimits[0])
+			posZ=chaiseLimits[0];
+	}	
 }
 
 /* Vérifie que le joueur ne sort pas du terrain */
