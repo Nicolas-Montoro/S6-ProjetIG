@@ -289,7 +289,7 @@ GLvoid window_mouseFunc(int button, int state, int x, int y);
 GLvoid window_motionFunc(int x, int y);
 void Faire_Composantes();
 void checkCameraLimits();
-int checkPersoLimits();
+void checkPersoLimits();
 
 void init_cube(ObjectType object);
 void init_cylinder(ObjectType object, GLUquadricObj* qobj);
@@ -300,4 +300,3 @@ void init_torus(ObjectType object);
 
 
 #endif
-
